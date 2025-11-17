@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sistema de Optimización de Ruteo Vehicular (VRP)</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: #f5f5f5;
+      }
+
+      .container {
+        display: flex;
+        height: 100vh;
+      }
+
+      .sidebar {
+        width: 350px;
+        background: white;
+        padding: 20px;
+        overflow-y: auto;
+        box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+      }
+
+      .main-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      }
+
+      h1 {
+        color: #2c3e50;
+        margin-bottom: 20px;
+        font-size: 24px;
+      }
+
+      h2 {
+        color: #34495e;
+        margin: 20px 0 10px 0;
+        font-size: 18px;
+        border-bottom: 2px solid #3498db;
+        padding-bottom: 5px;
+      }
+
+      .form-group {
+        margin-bottom: 15px;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 5px;
+        color: #555;
+        font-weight: 500;
+      }
+
+      input,
+      select,
+      button {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+
+      button {
+        background: #3498db;
+        color: white;
+        border: none;
+        cursor: pointer;
+        font-weight: 600;
+        margin-top: 10px;
+        transition: background 0.3s;
+      }
+
+      button:hover {
+        background: #2980b9;
+      }
+
+      button.secondary {
+        background: #95a5a6;
+      }
+
+      button.secondary:hover {
+        background: #7f8c8d;
+      }
+
+      button.success {
+        background: #27ae60;
+      }
+
+      button.success:hover {
+        background: #229954;
+      }
+
+      #map {
+        height: 100%;
+        width: 100%;
+      }
+
+      .results {
+        background: #ecf0f1;
+        padding: 15px;
+        border-radius: 4px;
+        margin-top: 15px;
+      }
+
+      .result-item {
+        padding: 10px;
+        margin: 5px 0;
+        background: white;
+        border-radius: 4px;
+        border-left: 4px solid #3498db;
+      }
+
+      .result-item h3 {
+        color: #2c3e50;
+        font-size: 16px;
+        margin-bottom: 8px;
+      }
+
+      .metric {
+        display: flex;
+        justify-content: space-between;
+        margin: 5px 0;
+        color: #555;
+      }
+
+      .metric-value {
+        font-weight: 600;
+        color: #2c3e50;
+      }
+
+      .comparison-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+      }
+
+      .comparison-table th,
+      .comparison-table td {
+        padding: 8px;
+        text-align: left;
+        border-bottom: 1px solid #ddd;
+      }
+
+      .comparison-table th {
+        background: #3498db;
+        color: white;
+      }
+
+      .comparison-table tr:hover {
+        background: #f5f5f5;
+      }
+
+      .best-result {
+        background: #d5f4e6 !important;
+        font-weight: 600;
+      }
+
+      .destinations-list {
+        max-height: 150px;
+        overflow-y: auto;
+        background: #f9f9f9;
+        padding: 10px;
+        border-radius: 4px;
+        margin-top: 10px;
+      }
+
+      .destination-item {
+        padding: 5px;
+        font-size: 12px;
+        color: #555;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="sidebar">
+        <h1>Optimización de Ruteo Vehicular</h1>
+
+        <h2>Cargar Datos</h2>
+        <input
+          type="file"
+          id="jsonFileInput"
+          accept=".json"
+          style="display: none"
+          onchange="loadFromJSONFile(event)"
+        />
+        <button
+          class="success"
+          onclick="document.getElementById('jsonFileInput').click()"
+          style="width: 100%"
+        >
+          Cargar JSON
+        </button>
+        <div
+          id="destinationsList"
+          class="destinations-list"
+          style="margin-top: 15px"
+        ></div>
+
+        <h2>Algoritmos Heurísticos</h2>
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="useNearestNeighbor" checked /> Vecino Más
+            Cercano
+          </label>
+        </div>
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="useSavings" checked /> Algoritmo de
+            Ahorros (Clarke-Wright)
+          </label>
+        </div>
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="use2Opt" checked /> Mejora 2-Opt
+          </label>
+        </div>
+
+        <button class="success" onclick="solveVRP()">
+          Resolver Problema VRP
+        </button>
+        <button class="secondary" onclick="clearMap()">Limpiar Mapa</button>
+
+        <div id="results" class="results" style="display: none">
+          <h2>Resultados</h2>
+          <div id="resultsContent"></div>
+        </div>
+      </div>
+
+      <div class="main-content">
+        <div id="map"></div>
+      </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>
