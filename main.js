@@ -25,16 +25,11 @@ var vehicleColors = [
   "#c0392b",
 ];
 
-// Icono rojo para el depósito
+// Icono rojo local para el depósito
 const redDepotIcon = L.icon({
-  iconUrl:
-    "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png",
-  shadowUrl:
-    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
+  iconUrl: "assets/icons/marker-icon-red.png",
+  iconAnchor: [12, 41], // Punto del icono que corresponde a la ubicación
+  popupAnchor: [1, -34], // Punto desde el cual se abre el popup
 });
 
 // Helper: espera asincrónica
