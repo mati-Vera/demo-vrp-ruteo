@@ -1,4 +1,3 @@
-// Variables globales
 var map;
 var markers = [];
 var routes = [];
@@ -7,8 +6,12 @@ var timeMatrix = [];
 var destinations = [];
 var depot = null;
 var apiKey = "5b3ce3597851110001cf624887b16c2123524dcda1d1e157b61c63bf";
+// Variables globales para configuración del problema
+var numVehicles;
+var vehicleCapacity;
+var avgSpeed;
+var fuelConsumption; //cantidad de combustible por cada 100 km
 
-// Colores para diferentes vehículos
 var vehicleColors = [
   "#e74c3c",
   "#3498db",
@@ -22,6 +25,47 @@ var vehicleColors = [
   "#c0392b",
 ];
 
+// Helper: espera asincrónica
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Fetch con reintentos y manejo de 429 (Retry-After / backoff exponencial)
+async function fetchWithRetry(url, options = {}, maxAttempts = 5) {
+  let attempt = 0;
+  let delay = 500; // ms inicial
+
+  while (attempt < maxAttempts) {
+    attempt++;
+    try {
+      const res = await fetch(url, options);
+
+      if (res.status === 429) {
+        // Intentar leer Retry-After
+        const retryAfter = res.headers.get("Retry-After");
+        const waitMs = retryAfter ? parseFloat(retryAfter) * 1000 : delay;
+        await sleep(waitMs);
+        delay *= 2; // backoff exponencial
+        continue;
+      }
+
+      if (!res.ok) {
+        // Otros errores -> lanzar para manejo externo
+        const text = await res.text().catch(() => "");
+        throw new Error(`HTTP ${res.status}: ${text}`);
+      }
+
+      return res;
+    } catch (err) {
+      // Errores de red -> reintentar con backoff
+      if (attempt >= maxAttempts) throw err;
+      await sleep(delay);
+      delay *= 2;
+    }
+  }
+
+  throw new Error("Max retry attempts reached");
+}
 // Inicializar el mapa
 function initMap() {
   map = L.map("map").setView([-32.89084, -68.82717], 13);
@@ -30,15 +74,7 @@ function initMap() {
     attribution:
       '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   }).addTo(map);
-
-  // El mapa se inicializa sin datos, se cargarán desde JSON
 }
-
-// Variables globales para configuración del problema
-var numVehicles = 2;
-var vehicleCapacity = 100;
-var avgSpeed = 50;
-var fuelConsumption = 10;
 
 // Cargar datos desde un archivo JSON
 function loadFromJSONFile(event) {
@@ -101,10 +137,10 @@ function loadFromJSONFile(event) {
       // Cargar datos en variables globales
       depot = caseStudyData.depot;
       destinations = caseStudyData.destinations;
-      numVehicles = caseStudyData.numVehicles || 2;
-      vehicleCapacity = caseStudyData.vehicleCapacity || 100;
-      avgSpeed = caseStudyData.avgSpeed || 50;
-      fuelConsumption = caseStudyData.fuelConsumption || 10;
+      numVehicles = caseStudyData.numVehicles;
+      vehicleCapacity = caseStudyData.vehicleCapacity;
+      avgSpeed = caseStudyData.avgSpeed;
+      fuelConsumption = caseStudyData.fuelConsumption;
 
       // Actualizar lista de destinos en la interfaz
       const destinationsList = document.getElementById("destinationsList");
@@ -167,24 +203,11 @@ function loadFromJSONFile(event) {
           `Algunos clientes no podrán ser atendidos.\n\n`;
       }
 
-      message += ``;
-
       alert(message);
     } catch (error) {
       alert(
         `Error al cargar el archivo JSON: ${error.message}\n\n` +
-          `Asegúrese de que el archivo tenga el formato correcto:\n` +
-          `{\n` +
-          `  "depot": { "lat": -32.89084, "lng": -68.82717 },\n` +
-          `  "numVehicles": 3,\n` +
-          `  "vehicleCapacity": 100,\n` +
-          `  "avgSpeed": 50,\n` +
-          `  "fuelConsumption": 10,\n` +
-          `  "destinations": [\n` +
-          `    { "id": 1, "lat": -32.90084, "lng": -68.82717, "demand": 25 },\n` +
-          `    ...\n` +
-          `  ]\n` +
-          `}`
+          `Asegúrese de que el archivo tenga el formato correcto`
       );
     }
   };
@@ -221,50 +244,11 @@ async function calculateDistanceMatrix() {
     return true;
   } catch (error) {
     console.error("Error calculando matriz de distancias:", error);
-    // Usar distancias euclidianas como fallback
-    calculateEuclideanMatrix();
     return false;
   }
 }
 
-// Calcular matriz euclidiana como fallback
-function calculateEuclideanMatrix() {
-  const allPoints = [depot, ...destinations];
-  const n = allPoints.length;
-
-  distanceMatrix = [];
-  timeMatrix = [];
-
-  for (let i = 0; i < n; i++) {
-    distanceMatrix[i] = [];
-    timeMatrix[i] = [];
-    for (let j = 0; j < n; j++) {
-      const dist = haversineDistance(
-        allPoints[i].lat,
-        allPoints[i].lng,
-        allPoints[j].lat,
-        allPoints[j].lng
-      );
-      distanceMatrix[i][j] = dist;
-      timeMatrix[i][j] = (dist / avgSpeed) * 3600; // segundos
-    }
-  }
-}
-
-// Calcular distancia haversine entre dos puntos
-function haversineDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371; // Radio de la Tierra en km
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
+// ¿Utilizar? matriz euclidiana y distancia haversine
 
 // ============================================
 // HEURÍSTICA 1: VECINO MÁS CERCANO (NEAREST NEIGHBOR)
@@ -287,7 +271,6 @@ function haversineDistance(lat1, lon1, lat2, lon2) {
 function nearestNeighborVRP() {
   const vehicleRoutes = [];
   const unvisited = [...destinations];
-  const vehicleLoads = new Array(numVehicles).fill(0);
 
   for (let v = 0; v < numVehicles && unvisited.length > 0; v++) {
     const route = [0]; // Empezar en el depósito (índice 0)
@@ -312,7 +295,7 @@ function nearestNeighborVRP() {
         }
       }
 
-      if (nearestIdx === -1) break; // No hay más destinos que quepan
+      if (nearestIdx === -1) break; // No hay más destinos que entren
 
       const nextDest = unvisited.splice(nearestIdx, 1)[0];
       const nextIdx = destinations.indexOf(nextDest) + 1;
@@ -522,7 +505,7 @@ function calculateRouteTime(route) {
   return time;
 }
 
-// Calcular consumo de energía de una ruta
+// Calcular consumo de combustible en ruta
 function calculateRouteEnergy(route) {
   const distance = calculateRouteDistance(route);
   return (distance / 100) * fuelConsumption; // Litros
@@ -628,26 +611,90 @@ function evaluateSolution(routes, algorithmName, colorIndex) {
 }
 
 // Visualizar rutas en el mapa
-async function visualizeRoutes(routes, color, algorithmName) {
-  for (let v = 0; v < routes.length; v++) {
-    const route = routes[v];
+async function visualizeRoutes(routesParam, color, algorithmName) {
+  for (let v = 0; v < routesParam.length; v++) {
+    const route = routesParam[v];
     const routeColor = vehicleColors[v % vehicleColors.length];
 
-    for (let i = 0; i < route.length - 1; i++) {
-      const fromIdx = route[i];
-      const toIdx = route[i + 1];
+    // Construir coordenadas para la petición: [lng, lat]
+    const coords = route.map((idx) => {
+      const p = idx === 0 ? depot : destinations[idx - 1];
+      return [p.lng, p.lat];
+    });
 
-      const from = fromIdx === 0 ? depot : destinations[fromIdx - 1];
-      const to = toIdx === 0 ? depot : destinations[toIdx - 1];
+    // Contenido del popup (resumen)
+    const popupContent = `
+      <div style="text-align: center;">
+        <strong style="color: ${routeColor}; font-size: 14px;">${algorithmName}</strong><br>
+        <strong>Vehículo ${v + 1}</strong><br>
+        <hr style="margin: 5px 0;">
+        <span style="font-size: 12px;">Ruta: ${route
+          .map((i) => (i === 0 ? "D" : i))
+          .join(" → ")}</span>
+      </div>
+    `;
 
-      await drawRoute(
-        [from.lat, from.lng],
-        [to.lat, to.lng],
-        routeColor,
-        v + 1,
-        algorithmName,
-        route
+    try {
+      const body = {
+        coordinates: coords,
+        format: "geojson",
+        instructions: false,
+      };
+
+      const res = await fetchWithRetry(
+        "https://api.openrouteservice.org/v2/directions/driving-car/geojson",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: apiKey,
+          },
+          body: JSON.stringify(body),
+        },
+        5
       );
+
+      const data = await res.json();
+      const layer = L.geoJSON(data, {
+        style: {
+          color: routeColor,
+          weight: 4,
+          opacity: 0.7,
+        },
+      }).addTo(map);
+
+      layer.bindPopup(popupContent);
+      layer.on("mouseover", function (e) {
+        this.setStyle({ weight: 6, opacity: 1 });
+      });
+      layer.on("mouseout", function (e) {
+        this.setStyle({ weight: 4, opacity: 0.7 });
+      });
+
+      // Guardar en array global de capas
+      globalThis.routes.push(layer);
+    } catch (error) {
+      // Fallback: línea poligonal simple entre puntos (lat, lng)
+      const latlngs = route.map((idx) => {
+        const p = idx === 0 ? depot : destinations[idx - 1];
+        return [p.lat, p.lng];
+      });
+
+      const line = L.polyline(latlngs, {
+        color: routeColor,
+        weight: 4,
+        opacity: 0.7,
+      }).addTo(map);
+
+      line.bindPopup(popupContent);
+      line.on("mouseover", function (e) {
+        this.setStyle({ weight: 6, opacity: 1 });
+      });
+      line.on("mouseout", function (e) {
+        this.setStyle({ weight: 4, opacity: 0.7 });
+      });
+
+      globalThis.routes.push(line);
     }
   }
 }
