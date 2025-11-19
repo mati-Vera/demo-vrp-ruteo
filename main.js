@@ -25,6 +25,18 @@ var vehicleColors = [
   "#c0392b",
 ];
 
+// Icono rojo para el depósito
+const redDepotIcon = L.icon({
+  iconUrl:
+    "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png",
+  shadowUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+});
+
 // Helper: espera asincrónica
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -164,7 +176,9 @@ function loadFromJSONFile(event) {
         markers = [];
 
         // Agregar marcador del depósito
-        const depotMarker = L.marker([depot.lat, depot.lng])
+        const depotMarker = L.marker([depot.lat, depot.lng], {
+          icon: redDepotIcon,
+        })
           .addTo(map)
           .bindPopup("Centro de Distribución");
         markers.push(depotMarker);
@@ -532,7 +546,7 @@ async function solveVRP() {
   }
 
   // Mostrar depósito
-  const depotMarker = L.marker([depot.lat, depot.lng])
+  const depotMarker = L.marker([depot.lat, depot.lng], { icon: redDepotIcon })
     .addTo(map)
     .bindPopup("Centro de Distribución");
   markers.push(depotMarker);
