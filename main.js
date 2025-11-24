@@ -250,6 +250,42 @@ async function calculateDistanceMatrix() {
     const data = await response.json();
     distanceMatrix = data.distances;
     timeMatrix = data.durations;
+    // Imprimir matrices en consola con etiquetas legibles
+    try {
+      const labels = [
+        "Depósito",
+        ...destinations.map((d) => `Cliente ${d.id}`),
+      ];
+
+      console.groupCollapsed("Matriz de Distancias (unidades según API)");
+      console.log("Etiquetas:", labels);
+      for (let i = 0; i < distanceMatrix.length; i++) {
+        const row = distanceMatrix[i].map((v) =>
+          typeof v === "number" ? Number(v).toFixed(3) : v
+        );
+        console.log(`${labels[i]} -> [ ${row.join(", ")} ]`);
+      }
+      console.groupEnd();
+
+      console.groupCollapsed("Matriz de Tiempos (segundos) y (horas)");
+      for (let i = 0; i < timeMatrix.length; i++) {
+        const rowSec = timeMatrix[i].map((v) =>
+          typeof v === "number" ? Number(v).toFixed(1) : v
+        );
+        const rowHours = timeMatrix[i].map((v) =>
+          typeof v === "number" ? (v / 3600).toFixed(3) + " h" : v
+        );
+        console.log(
+          `${labels[i]} -> segundos: [ ${rowSec.join(
+            ", "
+          )} ]  |  horas: [ ${rowHours.join(", ")} ]`
+        );
+      }
+      console.groupEnd();
+    } catch (logErr) {
+      console.warn("No se pudieron imprimir las matrices en consola:", logErr);
+    }
+
     return true;
   } catch (error) {
     console.error("Error calculando matriz de distancias:", error);
@@ -259,24 +295,6 @@ async function calculateDistanceMatrix() {
 
 // ¿Utilizar? matriz euclidiana y distancia haversine
 
-// ============================================
-// HEURÍSTICA 1: VECINO MÁS CERCANO (NEAREST NEIGHBOR)
-//
-// DESCRIPCIÓN:
-// Algoritmo constructivo que en cada paso selecciona el cliente no visitado
-// más cercano al cliente actual, respetando las restricciones de capacidad.
-//
-// PSEUDOCÓDIGO:
-// 1. Para cada vehículo k:
-//    2. Iniciar ruta en el depósito
-//    3. Mientras haya clientes no visitados y capacidad disponible:
-//       4. Seleccionar el cliente no visitado más cercano que quepa
-//       5. Agregar a la ruta y actualizar carga
-//    6. Retornar al depósito
-//
-// COMPLEJIDAD: O(n²) donde n es el número de clientes
-// REFERENCIA: Clásico en literatura de VRP, ampliamente utilizado
-// ============================================
 function nearestNeighborVRP() {
   const vehicleRoutes = [];
   const unvisited = [...destinations];
@@ -361,28 +379,6 @@ function nearestNeighborVRP() {
   return vehicleRoutes;
 }
 
-// ============================================
-// HEURÍSTICA 2: ALGORITMO DE AHORROS (CLARKE-WRIGHT)
-//
-// DESCRIPCIÓN:
-// Algoritmo basado en el concepto de "ahorro" al combinar dos rutas.
-// El ahorro de combinar clientes i y j se calcula como:
-// s_ij = d(0,i) + d(0,j) - d(i,j)
-// donde d(0,i) es la distancia del depósito al cliente i.
-//
-// PSEUDOCÓDIGO:
-// 1. Calcular matriz de ahorros s_ij para todos los pares (i,j)
-// 2. Ordenar ahorros de mayor a menor
-// 3. Inicializar: cada cliente es una ruta [0, i, 0]
-// 4. Para cada ahorro s_ij en orden descendente:
-//    5. Si las rutas que terminan en i y empiezan en j pueden combinarse:
-//       6. Si la carga combinada ≤ capacidad:
-//          7. Combinar las rutas
-//
-// COMPLEJIDAD: O(n² log n) por el ordenamiento
-// REFERENCIA: Clarke & Wright (1964) - "Scheduling of Vehicles from a Central
-//            Depot to a Number of Delivery Points"
-// ============================================
 function savingsAlgorithmVRP() {
   // Calcular ahorros sij = d(0,i) + d(0,j) - d(i,j)
   const savings = [];
@@ -444,28 +440,6 @@ function savingsAlgorithmVRP() {
   return routes.map((r) => r.route);
 }
 
-// ============================================
-// HEURÍSTICA 3: MEJORA 2-OPT
-//
-// DESCRIPCIÓN:
-// Algoritmo de mejora local que busca mejorar una ruta existente invirtiendo
-// segmentos de la ruta. En cada iteración, prueba todas las inversiones
-// posibles de 2 arcos y mantiene la que reduce más la distancia.
-//
-// PSEUDOCÓDIGO:
-// 1. Mejorar = true
-// 2. Mientras mejorar:
-//    3. Mejorar = false
-//    4. Para cada par (i, j) de posiciones en la ruta:
-//       5. Crear nueva ruta invirtiendo segmento entre i y j
-//       6. Si nueva distancia < mejor distancia:
-//          7. Actualizar mejor ruta
-//          8. Mejorar = true
-//
-// COMPLEJIDAD: O(n²) por iteración
-// REFERENCIA: Croes (1958) - "A Method for Solving Traveling-Salesman Problems"
-// NOTA: Puede aplicarse a cualquier solución inicial
-// ============================================
 function twoOptImprovement(route) {
   let improved = true;
   let bestRoute = [...route];
@@ -520,9 +494,6 @@ function calculateRouteEnergy(route) {
   return (distance / 100) * fuelConsumption; // Litros
 }
 
-// ============================================
-// FUNCIÓN PRINCIPAL: RESOLVER VRP
-// ============================================
 async function solveVRP() {
   clearMap();
 
