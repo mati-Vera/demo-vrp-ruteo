@@ -250,14 +250,14 @@ async function calculateDistanceMatrix() {
     const data = await response.json();
     distanceMatrix = data.distances;
     timeMatrix = data.durations;
-    // Imprimir matrices en consola con etiquetas legibles
+    // Imprimir matrices en consola
     try {
       const labels = [
         "Depósito",
         ...destinations.map((d) => `Cliente ${d.id}`),
       ];
 
-      console.groupCollapsed("Matriz de Distancias (unidades según API)");
+      console.groupCollapsed("Matriz de Distancias");
       console.log("Etiquetas:", labels);
       for (let i = 0; i < distanceMatrix.length; i++) {
         const row = distanceMatrix[i].map((v) =>
@@ -267,7 +267,7 @@ async function calculateDistanceMatrix() {
       }
       console.groupEnd();
 
-      console.groupCollapsed("Matriz de Tiempos (segundos) y (horas)");
+      console.groupCollapsed("Matriz de Tiempos");
       for (let i = 0; i < timeMatrix.length; i++) {
         const rowSec = timeMatrix[i].map((v) =>
           typeof v === "number" ? Number(v).toFixed(1) : v
@@ -492,6 +492,23 @@ function calculateRouteTime(route) {
 function calculateRouteEnergy(route) {
   const distance = calculateRouteDistance(route);
   return (distance / 100) * fuelConsumption; // Litros
+}
+
+// Formatear segundos a representación legible en horas y minutos
+function formatTime(seconds) {
+  if (typeof seconds !== "number" || isNaN(seconds)) return "-";
+  const totalSec = Math.max(0, Math.round(seconds));
+  const hrs = Math.floor(totalSec / 3600);
+  const mins = Math.floor((totalSec % 3600) / 60);
+  const decHours = (seconds / 3600).toFixed(2);
+
+  if (hrs > 0) {
+    return `${hrs}h ${mins}m (${decHours} h)`;
+  } else if (mins > 0) {
+    return `${mins}m (${decHours} h)`;
+  } else {
+    return `${totalSec}s (${decHours} h)`;
+  }
 }
 
 async function solveVRP() {
@@ -801,7 +818,7 @@ function displayResults(results) {
     html += `<tr class="${rowClass}">`;
     html += `<td>${result.algorithm}</td>`;
     html += `<td>${result.distance.toFixed(2)}</td>`;
-    html += `<td>${(result.time / 3600).toFixed(2)}</td>`;
+    html += `<td>${formatTime(result.time)}</td>`;
     html += `<td>${result.energy.toFixed(2)}</td>`;
     html += `<td>${result.vehicles}</td>`;
     html += "</tr>";
@@ -816,9 +833,9 @@ function displayResults(results) {
   html += `<div class="metric"><span>Distancia Total:</span><span class="metric-value">${bestResult.distance.toFixed(
     2
   )} km</span></div>`;
-  html += `<div class="metric"><span>Tiempo Total:</span><span class="metric-value">${(
-    bestResult.time / 3600
-  ).toFixed(2)} horas</span></div>`;
+  html += `<div class="metric"><span>Tiempo Total:</span><span class="metric-value">${formatTime(
+    bestResult.time
+  )}</span></div>`;
   html += `<div class="metric"><span>Consumo de Combustible:</span><span class="metric-value">${bestResult.energy.toFixed(
     2
   )} litros</span></div>`;
@@ -839,9 +856,9 @@ function displayResults(results) {
     html += `<div class="metric"><span>Distancia:</span><span class="metric-value">${routeDist.toFixed(
       2
     )} km</span></div>`;
-    html += `<div class="metric"><span>Tiempo:</span><span class="metric-value">${(
-      routeTime / 3600
-    ).toFixed(2)} h</span></div>`;
+    html += `<div class="metric"><span>Tiempo:</span><span class="metric-value">${formatTime(
+      routeTime
+    )}</span></div>`;
     html += `<div class="metric"><span>Combustible:</span><span class="metric-value">${routeEnergy.toFixed(
       2
     )} L</span></div>`;
@@ -1011,7 +1028,7 @@ function displayResultsInNewTab(results) {
     html += `<tr class="${rowClass}">`;
     html += `<td>${result.algorithm}</td>`;
     html += `<td>${result.distance.toFixed(2)}</td>`;
-    html += `<td>${(result.time / 3600).toFixed(2)}</td>`;
+    html += `<td>${formatTime(result.time)}</td>`;
     html += `<td>${result.energy.toFixed(2)}</td>`;
     html += `<td>${result.vehicles}</td>`;
     html += "</tr>";
@@ -1065,9 +1082,9 @@ function displayResultsInNewTab(results) {
     html += `<div class="metric"><span>Distancia:</span><span class="metric-value">${routeDist.toFixed(
       2
     )} km</span></div>`;
-    html += `<div class="metric"><span>Tiempo:</span><span class="metric-value">${(
-      routeTime / 3600
-    ).toFixed(2)} h</span></div>`;
+    html += `<div class="metric"><span>Tiempo:</span><span class="metric-value">${formatTime(
+      routeTime
+    )}</span></div>`;
     html += `<div class="metric"><span>Combustible:</span><span class="metric-value">${routeEnergy.toFixed(
       2
     )} L</span></div>`;
