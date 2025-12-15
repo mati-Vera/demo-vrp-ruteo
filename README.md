@@ -15,6 +15,7 @@ Estructura del repositorio
 - `PDFs/` — documentación y material de apoyo (consultar para detalles teóricos y especificaciones).
 
 Formato esperado de los casos JSON
+
 El archivo JSON que se carga debe tener la siguiente estructura (ejemplo mínimo):
 
 ```
